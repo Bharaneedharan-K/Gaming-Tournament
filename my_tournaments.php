@@ -1,7 +1,6 @@
 <?php
 require_once 'config/database.php';
 require_once 'includes/header.php';
-require_once 'includes/game_images.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -124,18 +123,10 @@ $tournaments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     margin-bottom: 30px;
 }
 
-.game-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    object-fit: cover;
-    margin-right: 10px;
-    border: 2px solid rgba(13, 110, 253, 0.3);
-}
-
 .tournament-link {
     display: flex;
     align-items: center;
+    text-decoration: none;
 }
 
 .btn-group .btn {
@@ -233,9 +224,6 @@ $tournaments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <td>
                                             <a href="tournament_details.php?id=<?php echo $tournament['tournament_id']; ?>" 
                                                class="text-light text-decoration-none tournament-link">
-                                                <img src="<?php echo getGameImagePath($tournament['game_name']); ?>" 
-                                                     alt="<?php echo htmlspecialchars($tournament['game_name']); ?>" 
-                                                     class="game-icon">
                                                 <span>
                                                     <i class="fas fa-trophy text-warning me-2"></i>
                                                     <?php echo htmlspecialchars($tournament['tournament_name']); ?>

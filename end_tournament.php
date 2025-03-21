@@ -64,9 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Get winners
-$stmt = $db->prepare("SELECT tw.*, u.username, tp.team_name 
+$stmt = $db->prepare("SELECT DISTINCT tw.position, tw.user_id, u.username, tp.team_name 
                     FROM tournament_winners tw 
-                    JOIN tournament_participants tp ON tw.user_id = tp.user_id 
+                    JOIN tournament_participants tp ON tw.user_id = tp.user_id AND tp.tournament_id = tw.tournament_id
                     JOIN users u ON tw.user_id = u.user_id 
                     WHERE tw.tournament_id = ? 
                     ORDER BY tw.position");

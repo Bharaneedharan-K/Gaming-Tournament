@@ -5,6 +5,14 @@ require_once 'includes/header.php';
 $database = new Database();
 $db = $database->getConnection();
 
+// Define game images mapping with URLs
+$game_images = [
+    'among us' => 'https://www.innersloth.com/wp-content/uploads/2024/06/2024roles_nologo.png',
+    'minecraft' => 'https://m.economictimes.com/thumb/msid-98433841,width-1600,height-900,resizemode-4,imgsize-12430/minecraft-mods-how-to-install.jpg',
+    'free fire' => 'https://static-cdn.jtvnw.net/jtv_user_pictures/43aa2943-730e-427c-bcec-6cdef4d4c4d1-profile_banner-480.jpeg',
+    'bgmi' => 'https://images.firstpost.com/wp-content/uploads/2022/07/Explained-Why-Google-and-Apple-removed-BGMI-from-their-respective-app-stores-2-years-after-PUBG-ban-2.jpg'
+];
+
 // Get filter parameters
 $game_filter = isset($_GET['game']) ? $_GET['game'] : '';
 $type_filter = isset($_GET['type']) ? $_GET['type'] : '';
@@ -60,6 +68,12 @@ $games = $stmt->fetchAll(PDO::FETCH_COLUMN);
 .tournament-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
+}
+
+.tournament-image {
+    height: 200px;
+    object-fit: cover;
+    width: 100%;
 }
 
 .tournament-info p {
@@ -206,6 +220,11 @@ $games = $stmt->fetchAll(PDO::FETCH_COLUMN);
                         <?php foreach ($tournaments as $tournament): ?>
                             <div class="col-md-4 mb-4">
                                 <div class="card tournament-card h-100">
+                                    <?php 
+                                    $game_name = strtolower(trim($tournament['game_name']));
+                                    $image_path = isset($game_images[$game_name]) ? $game_images[$game_name] : 'https://via.placeholder.com/800x400?text=Game+Image';
+                                    ?>
+                                    <img src="<?php echo $image_path; ?>" class="tournament-image" alt="<?php echo htmlspecialchars($tournament['game_name']); ?>">
                                     <?php if ($tournament['is_paid']): ?>
                                         <div class="tournament-badge bg-warning text-dark">
                                             <i class="fas fa-coins me-1"></i>Paid Tournament

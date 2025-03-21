@@ -32,48 +32,61 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_SESSION['user_id'])) {
     $transaction_id = isset($_POST['transaction_id']) ? trim($_POST['transaction_id']) : null;
     $team_name = isset($_POST['team_name']) ? trim($_POST['team_name']) : null;
 
+    // Validate paid tournament requirements first
+    if ($tournament['is_paid'] && empty($transaction_id)) {
+        $error = "Transaction ID is required for paid tournaments";
+    }
+
+    // Validate team-based requirements
+    if ($tournament['is_team_based'] && empty($team_name)) {
+        $error = "Team name is required for team-based tournaments";
+    }
+
     // Check if already joined
-    $stmt = $db->prepare("SELECT participant_id FROM tournament_participants 
-                        WHERE tournament_id = ? AND user_id = ?");
-    $stmt->execute([$_GET['id'], $_SESSION['user_id']]);
-    if ($stmt->rowCount() > 0) {
-        $error = "You have already joined this tournament";
-    } else {
-        // Validate paid tournament requirements
-        if ($tournament['is_paid']) {
-            if (empty($transaction_id)) {
-                $error = "Transaction ID is required for paid tournaments";
-            }
-        }
-
-        // Validate team-based requirements
-        if ($tournament['is_team_based']) {
-            if (empty($team_name)) {
-                $error = "Team name is required for team-based tournaments";
-            }
-        }
-
-        if (empty($error)) {
-            $stmt = $db->prepare("INSERT INTO tournament_participants 
-                                (tournament_id, user_id, team_name, transaction_id, is_approved) 
-                                VALUES (?, ?, ?, ?, ?)");
-            
-            $is_approved = $tournament['auto_approval'] ? 1 : 0;
-            
-            if ($stmt->execute([$_GET['id'], $_SESSION['user_id'], $team_name, $transaction_id, $is_approved])) {
-                $success = "Successfully joined the tournament!";
+    if (empty($error)) {
+        $stmt = $db->prepare("SELECT participant_id FROM tournament_participants 
+                            WHERE tournament_id = ? AND user_id = ?");
+        $stmt->execute([$_GET['id'], $_SESSION['user_id']]);
+        if ($stmt->rowCount() > 0) {
+            $error = "You have already joined this tournament";
+        } else {
+            // Check if tournament is full
+            if ($tournament['current_participants'] >= $tournament['max_players']) {
+                $error = "This tournament is full";
             } else {
-                $error = "Failed to join tournament. Please try again.";
+                $stmt = $db->prepare("INSERT INTO tournament_participants 
+                                    (tournament_id, user_id, team_name, transaction_id, is_approved) 
+                                    VALUES (?, ?, ?, ?, ?)");
+                
+                $is_approved = $tournament['auto_approval'] ? 1 : 0;
+                
+                if ($stmt->execute([$_GET['id'], $_SESSION['user_id'], $team_name, $transaction_id, $is_approved])) {
+                    $success = "Successfully joined the tournament!";
+                    // Refresh the page to update the participant count and status
+                    header("Location: tournament_details.php?id=" . $_GET['id']);
+                    exit();
+                } else {
+                    $error = "Failed to join tournament. Please try again.";
+                }
             }
         }
     }
 }
 
 // Get participants
-$stmt = $db->prepare("SELECT tp.*, u.username 
+$stmt = $db->prepare("SELECT tp.*, u.username, 
+                    CASE 
+                        WHEN tp.status = 'approved' OR tp.is_approved = 1 THEN 'Approved'
+                        WHEN tp.status = 'rejected' OR tp.is_approved = 0 THEN 'Pending'
+                        ELSE 'Pending'
+                    END as status
                     FROM tournament_participants tp 
                     JOIN users u ON tp.user_id = u.user_id 
-                    WHERE tp.tournament_id = ? AND tp.is_approved = 1");
+                    WHERE tp.tournament_id = ?
+                    ORDER BY CASE 
+                        WHEN tp.status = 'approved' OR tp.is_approved = 1 THEN 1
+                        ELSE 2
+                    END, tp.joined_at ASC");
 $stmt->execute([$_GET['id']]);
 $participants = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -81,13 +94,14 @@ $participants = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $has_joined = false;
 $is_approved = false;
 if (isset($_SESSION['user_id'])) {
-    $stmt = $db->prepare("SELECT is_approved FROM tournament_participants 
-                        WHERE tournament_id = ? AND user_id = ?");
+    $stmt = $db->prepare("SELECT tp.is_approved, tp.status 
+                        FROM tournament_participants tp
+                        WHERE tp.tournament_id = ? AND tp.user_id = ?");
     $stmt->execute([$_GET['id'], $_SESSION['user_id']]);
     $participant = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($participant) {
         $has_joined = true;
-        $is_approved = $participant['is_approved'];
+        $is_approved = ($participant['status'] === 'approved' || $participant['is_approved'] == 1);
     }
 }
 ?>
@@ -143,6 +157,12 @@ if (isset($_SESSION['user_id'])) {
                             </div>
                         <?php endif; ?>
                     <?php elseif ($tournament['current_participants'] < $tournament['max_players']): ?>
+                        <?php if ($error): ?>
+                            <div class="alert alert-danger"><?php echo $error; ?></div>
+                        <?php endif; ?>
+                        <?php if ($success): ?>
+                            <div class="alert alert-success"><?php echo $success; ?></div>
+                        <?php endif; ?>
                         <form method="POST" action="">
                             <?php if ($tournament['is_team_based']): ?>
                                 <div class="mb-3">
@@ -155,6 +175,7 @@ if (isset($_SESSION['user_id'])) {
                                 <div class="mb-3">
                                     <label for="transaction_id" class="form-label">Transaction ID</label>
                                     <input type="text" class="form-control" id="transaction_id" name="transaction_id" required>
+                                    <small class="text-muted">Please make the payment to UPI ID: <?php echo htmlspecialchars($tournament['upi_id']); ?> before joining</small>
                                 </div>
                             <?php endif; ?>
 
@@ -181,6 +202,8 @@ if (isset($_SESSION['user_id'])) {
                                     <?php if ($tournament['is_team_based']): ?>
                                         <th>Team Name</th>
                                     <?php endif; ?>
+                                    <th>Status</th>
+                                    <th>Joined At</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -190,13 +213,21 @@ if (isset($_SESSION['user_id'])) {
                                         <?php if ($tournament['is_team_based']): ?>
                                             <td><?php echo htmlspecialchars($participant['team_name']); ?></td>
                                         <?php endif; ?>
+                                        <td>
+                                            <span class="badge bg-<?php echo $participant['status'] == 'Approved' ? 'success' : 'warning'; ?>">
+                                                <?php echo $participant['status']; ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo date('M d, Y H:i', strtotime($participant['joined_at'])); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
                 <?php else: ?>
-                    <p>No participants yet.</p>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>No participants have joined yet.
+                    </div>
                 <?php endif; ?>
             </div>
         </div>

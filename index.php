@@ -5,13 +5,21 @@ require_once 'includes/header.php';
 $database = new Database();
 $db = $database->getConnection();
 
+// Define game images mapping with URLs
+$game_images = [
+    'among us' => 'https://www.innersloth.com/wp-content/uploads/2024/06/2024roles_nologo.png',
+    'minecraft' => 'https://m.economictimes.com/thumb/msid-98433841,width-1600,height-900,resizemode-4,imgsize-12430/minecraft-mods-how-to-install.jpg',
+    'free fire' => 'https://static-cdn.jtvnw.net/jtv_user_pictures/43aa2943-730e-427c-bcec-6cdef4d4c4d1-profile_banner-480.jpeg',
+    'bgmi' => 'https://images.firstpost.com/wp-content/uploads/2022/07/Explained-Why-Google-and-Apple-removed-BGMI-from-their-respective-app-stores-2-years-after-PUBG-ban-2.jpg'
+];
+
 // Get featured tournaments
 $stmt = $db->query("SELECT t.*, u.username as owner_name, 
                     (SELECT COUNT(*) FROM tournament_participants WHERE tournament_id = t.tournament_id) as current_participants
                     FROM tournaments t 
                     JOIN users u ON t.owner_id = u.user_id 
                     WHERE t.status = 'active' 
-                    ORDER BY t.created_at DESC LIMIT 6");
+                    ORDER BY t.created_at DESC LIMIT 4");
 $featured_tournaments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get user info if logged in
@@ -40,6 +48,14 @@ if (isset($_SESSION['user_id'])) {
                             <?php foreach ($featured_tournaments as $tournament): ?>
                                 <div class="col-md-6 mb-4">
                                     <div class="card h-100 bg-dark text-light">
+                                        <?php 
+                                        $game_name = strtolower(trim($tournament['game_name']));
+                                        // Debug output
+                                        error_log("Game name from DB: " . $tournament['game_name']);
+                                        error_log("Processed game name: " . $game_name);
+                                        $image_path = isset($game_images[$game_name]) ? $game_images[$game_name] : 'https://via.placeholder.com/800x400?text=Game+Image';
+                                        ?>
+                                        <img src="<?php echo $image_path; ?>" class="card-img-top" alt="<?php echo htmlspecialchars($tournament['game_name']); ?>" style="height: 150px; object-fit: cover;">
                                         <div class="card-body">
                                             <h5 class="card-title text-light"><?php echo htmlspecialchars($tournament['tournament_name']); ?></h5>
                                             <p class="card-text text-light">
@@ -60,6 +76,11 @@ if (isset($_SESSION['user_id'])) {
                                     </div>
                                 </div>
                             <?php endforeach; ?>
+                        </div>
+                        <div class="text-center mt-4">
+                            <a href="tournaments.php" class="btn btn-primary btn-lg">
+                                <i class="fas fa-list me-2"></i>See More Tournaments
+                            </a>
                         </div>
                     <?php endif; ?>
                 </div>

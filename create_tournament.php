@@ -150,9 +150,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     <div class="mb-3">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="is_paid" name="is_paid">
+                            <input class="form-check-input" type="checkbox" id="is_paid" name="is_paid" <?php echo $user_points < 1000 ? 'disabled' : ''; ?>>
                             <label class="form-check-label" for="is_paid">Paid Tournament</label>
                             <small class="text-muted d-block">(Requires 1000+ points)</small>
+                            <?php if ($user_points < 1000): ?>
+                                <div class="alert alert-warning mt-2">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Your current points (<?php echo $user_points; ?>) are less than 1000. You need at least 1000 points to create paid tournaments.
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -195,9 +201,21 @@ document.getElementById('is_team_based').addEventListener('change', function() {
     document.getElementById('team_fields').style.display = this.checked ? 'block' : 'none';
 });
 
-document.getElementById('is_paid').addEventListener('change', function() {
+const userPoints = <?php echo $user_points; ?>;
+const isPaidCheckbox = document.getElementById('is_paid');
+
+isPaidCheckbox.addEventListener('change', function() {
     document.getElementById('paid_fields').style.display = this.checked ? 'block' : 'none';
 });
+
+if (userPoints < 1000) {
+    isPaidCheckbox.addEventListener('click', function(e) {
+        if (!this.disabled) {
+            e.preventDefault();
+            alert('Your points (' + userPoints + ') are less than 1000. You need at least 1000 points to create paid tournaments.');
+        }
+    });
+}
 </script>
 
 <?php require_once 'includes/footer.php'; ?> 
